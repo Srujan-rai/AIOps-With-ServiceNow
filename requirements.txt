@@ -1,0 +1,8 @@
+google-generativeai
+supabase
+python-dotenv
+requests
+langchain-huggingface
+sentence-transformers
+gunicorn
+functions-framework

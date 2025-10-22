@@ -1,0 +1,215 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=urgency :{{ $json.urgency }}\nshort description: {{ $json.short_description }}\ndescription: {{ $json.description }}\nseverity:{{ $json.severity }}"
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "options": {
+          "systemMessage": "=You are the Niveus Ticket Assistant, an advanced AI assistant for IT Service Desk agents.  \nYour role is to analyze newly created incidents and provide structured suggestions to help the agent resolve them efficiently.  \n\nFollow IT Service Desk SOP and prioritize actions based on it.  \n\nThe system provides the following incident details as input:  \n- caller_email  \n- short_description  \n- description  \n- impact (1 = High, 2 = Medium, 3 = Low)  \n- urgency (1 = High, 2 = Medium, 3 = Low)  \n- incident_state  \n\nYour tasks:  \n1. Draft a professional resolution email for the user, which must include:  \n   - Clear resolution steps the user can follow.  \n   - Reference links to relevant documentation or knowledge base articles.  \n2. Provide detailed work notes for the Service Desk (internal resolution notes).  \n3. Recalculate and update:  \n   - impact (1/2/3)  \n   - urgency (1/2/3)  \n   - severity (High/Medium/Low, based on impact × urgency mapping)  \n   - incident_state  \n\nAll output MUST be returned in **valid JSON** with the exact structure:  \n\n{\n  \"caller_email\": \"<from input>\",\n  \"short_description\": \"<from input>\",\n  \"description\": \"<from input>\",\n  \"impact\": \"<recalculated value: 1/2/3>\",\n  \"urgency\": \"<recalculated value: 1/2/3>\",\n  \"severity\": \"<calculated value: High/Medium/Low>\",\n  \"incident_state\": \"<recalculated value>\",\n  \"resolution_email\": {\n    \"subject\": \"Incident <ID/placeholder> - <short description>\",\n    \"body\": \"Drafted resolution email text, including step-by-step instructions and links to documentation\"\n  },\n  \"work_notes\": \"Internal resolution notes for Service Desk, including actions taken and references\"\n}\n"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        464,
+        0
+      ],
+      "id": "4d820b13-6633-47ca-855d-89be6c9d8def",
+      "name": "Message a model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "owiGQgVZXRR6zCbC",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "resource": "incident",
+        "operation": "update",
+        "id": "={{ $('Webhook').item.json.body.incident_id }}",
+        "updateFields": {
+          "impact": "={{ $json.impact }}",
+          "urgency": "={{ $json.urgency }}",
+          "work_notes": "={{ $json.work_notes }}"
+        }
+      },
+      "type": "n8n-nodes-base.serviceNow",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "1a43cbe7-a977-44f9-9b30-1f7db9207fee",
+      "name": "Update an incident",
+      "credentials": {
+        "serviceNowBasicApi": {
+          "id": "zdF0WstsIDA7niEJ",
+          "name": "ServiceNow Basic Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const rawText = $input.first().json.content.parts[0].text//\n\n// Parse the JSON string\nlet incidentData;\ntry {\n  incidentData = JSON.parse(rawText);\n} catch (error) {\n  throw new Error(\"Failed to parse incident JSON: \" + error.message);\n}\n\n// Optional: Flatten nested objects like resolution_email\nfunction flatten(obj, parentKey = '', result = {}) {\n  for (const key in obj) {\n    const propName = parentKey ? `${parentKey}.${key}` : key;\n    if (typeof obj[key] === 'object' && obj[key] !== null) {\n      flatten(obj[key], propName, result);\n    } else {\n      result[propName] = obj[key];\n    }\n  }\n  return result;\n}\n\nconst flattenedData = flatten(incidentData);\n\n// Return as an array for n8n\nreturn [\n  {\n    json: flattenedData\n  }\n];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        816,
+        0
+      ],
+      "id": "ad390272-5af8-4c7c-b148-fdbed5353f1e",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "32c67375-9ec5-41ad-9dd6-37d790013627",
+        "responseMode": "lastNode",
+        "options": {
+          "binaryPropertyName": "1c741bd70b2322007518478d83673af3"
+        }
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2dd74766-a118-4a46-9415-402c08f0ae7c",
+      "name": "Webhook",
+      "webhookId": "32c67375-9ec5-41ad-9dd6-37d790013627"
+    },
+    {
+      "parameters": {
+        "authentication": "basicAuth",
+        "resource": "incident",
+        "id": "={{ $json.body.incident_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.serviceNow",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "id": "54ec560a-b2a6-4ad9-88e8-ac7bd8b2a2d8",
+      "name": "Get an incident",
+      "credentials": {
+        "serviceNowBasicApi": {
+          "id": "zdF0WstsIDA7niEJ",
+          "name": "ServiceNow Basic Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "srujan.rai@niveussolutions.com",
+        "toEmail": "=srujan.rai@niveussolutions.com",
+        "subject": "={{ $('Code in JavaScript').item.json['resolution_email.subject'] }}",
+        "emailFormat": "text",
+        "text": "={{ $('Code in JavaScript').item.json['resolution_email.body'] }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1248,
+        0
+      ],
+      "id": "e1986089-1d90-4e55-96ee-b89789c8aca1",
+      "name": "Send email",
+      "webhookId": "e9466608-06f4-447e-847c-e1d85158b12c",
+      "credentials": {
+        "smtp": {
+          "id": "Oi5fmSk5CjcenNNW",
+          "name": "SMTP account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update an incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get an incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update an incident": {
+      "main": [
+        [
+          {
+            "node": "Send email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get an incident": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "789de2d1-b245-4722-8382-90076b02e7d0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4bb3508e0116bfd5e3d5f71a0d93abb14597186d64d192fbc00afe00654074ba"
+  },
+  "id": "WxkCsAyMq9ISPLqz",
+  "tags": []
+}
